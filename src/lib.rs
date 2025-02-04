@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 pub type Output<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 pub struct ServiceContext {
-    pub data: Arc<RwLock<HashMap<String, Box<dyn Any + Send + Sync>>>>,
+    data: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
 }
 
 impl Default for ServiceContext {
@@ -29,12 +29,15 @@ impl ServiceContext {
 
     pub async fn insert<T: Any + Send + Sync>(&self, key: String, value: T) {
         let mut data = self.data.write().await;
-        data.insert(key, Box::new(value));
+        data.insert(key, Arc::new(value));
     }
 
-    pub async fn get<T: Any + Send + Sync + Clone>(&self, key: &str) -> Option<T> {
+    pub async fn get<T: Any + Send + Sync>(&self, key: &str) -> Option<Arc<T>> {
         let data = self.data.read().await;
-        data.get(key)?.downcast_ref::<T>().cloned()
+        data.get(key)?
+            .clone()
+            .downcast::<T>()
+            .ok()
     }
 }
 

@@ -33,7 +33,15 @@ Defines a contract that all services must implement. Each service processes an i
 
 ```rust
 pub trait BasicService: Send + Sync {
-    fn call(&self, input: ProcessingResult, context: Arc<ServiceContext>) -> Pin<Box<dyn Future<Output = ProcessingResult> + Send>>;
+    type Input: Send + Sync;
+    type Output: Send + Sync;
+    type Error: Error + Send + Sync;
+
+    fn call(
+        &self,
+        input: Self::Input,
+        context: Arc<ServiceContext>,
+    ) -> Output<Result<Self::Output, Self::Error>>;
 }
 ```
 
@@ -41,7 +49,8 @@ pub trait BasicService: Send + Sync {
 Manages and executes services in sequence. It can be initialized using:
 
 ```rust
-let processor = ServiceProcessor::build(context, vec![ExampleService]);
+let processor = ServiceProcessor::new((ExampleService), context);
+processor.execute(input).await.unwrap();
 ```
 
 ### **4️⃣ Example Implementation**
@@ -51,6 +60,10 @@ An example service and output type:
 pub struct ExampleService;
 
 impl BasicService for ExampleService {
+    type Input = ProcessingResult;
+    type Output = ProcessingResult;
+    type Error = ServiceError;
+
     fn call(&self, input: ProcessingResult, context: Arc<ServiceContext>) -> Pin<Box<dyn Future<Output = ProcessingResult> + Send>> {
         Box::pin(async move {
             let state = context.shared_state.read().await.clone();
@@ -60,10 +73,6 @@ impl BasicService for ExampleService {
     }
 }
 ```
-
-## 📚 Dependencies
-- 🚀 `tokio` - For async execution.
-- 🛠️ `async-trait` - Enables async functions in traits.
 
 ## 🌟 Future Improvements
 - 🏎️ **Parallel Execution:** Add support for concurrent service execution.
